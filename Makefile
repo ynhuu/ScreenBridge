@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-PACKAGE := dist/ScreenBridge-v1.0.0.zip
+PACKAGE := dist/ScreenBridge-v1.0.1.zip
 SERVER := bin/screenbridge
 
 .PHONY: all build package test web-test native-test vet check clean distclean help

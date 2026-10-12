@@ -149,7 +149,7 @@ mkdir -p "$ROOT/bin"
 chmod 755 "$ROOT/bin/screenbridge"
 
 mkdir -p "$ROOT/dist"
-PACKAGE="$ROOT/dist/ScreenBridge-v1.0.0.zip"
+PACKAGE="$ROOT/dist/ScreenBridge-v1.0.1.zip"
 rm -f "$PACKAGE"
 (
   cd "$ROOT/module"

@@ -30,6 +30,7 @@
       height: 100vh;
       height: 100dvh;
     }
+    html.ios-standalone body { height: 100vh; }
     :root:fullscreen { background: #111318; }
     :root:fullscreen body { max-width: none; padding: 0; }
     button {
@@ -231,6 +232,7 @@
   <script src="/assets/settings.js"></script>
   <script>
     const TOUCH_MOVE_INTERVAL_MS = 1000 / 30;
+    document.documentElement.classList.toggle("ios-standalone", navigator.standalone === true);
     const video = document.getElementById("screen-video");
     const screen = document.getElementById("screen");
     const screenViewport = document.getElementById("screen-viewport");

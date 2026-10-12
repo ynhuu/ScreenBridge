@@ -4,6 +4,25 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
 
+test("normal browsers use dvh while iOS standalone uses vh", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../app/web/index.html"), "utf8");
+  assert.match(html, /html, body\s*\{[^}]*height: 100%;/);
+  const body = html.match(/\n    body\s*\{([^}]+)\}/)[1];
+  assert.match(body, /height:\s*100vh;/);
+  assert.match(body, /height:\s*100dvh;/);
+  assert.ok(body.indexOf("height: 100vh;") < body.indexOf("height: 100dvh;"));
+  assert.match(html, /html\.ios-standalone body\s*\{\s*height: 100vh;/);
+  const detection = html.match(/    document\.documentElement\.classList\.toggle\("ios-standalone", navigator\.standalone === true\);/)[0];
+  for (const [standalone, expected] of [[true, true], [false, false], [undefined, false]]) {
+    let active;
+    const context = vm.createContext({ navigator: { standalone }, document: {
+      documentElement: { classList: { toggle(name, value) { assert.equal(name, "ios-standalone"); active = value; } } }
+    } });
+    vm.runInContext(detection, context);
+    assert.equal(active, expected);
+  }
+});
+
 test("video preferences survive refresh and reject invalid or unavailable storage", () => {
   const html = fs.readFileSync(path.join(__dirname, "../app/web/index.html"), "utf8");
   const read = html.match(/    function readVideoPreference\([\s\S]*?\n    \}/)[0];

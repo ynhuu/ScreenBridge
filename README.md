@@ -4,6 +4,11 @@
 
 网页和原生库内嵌于单个可执行文件，手机无需额外安装控制 App。
 
+## v1.0.1 更新
+
+- 修复不同浏览器运行模式下的画面位置问题：普通浏览器使用动态视口高度 `100dvh`（不支持时回退 `100vh`），iOS 主屏幕应用使用 `100vh`。
+- 保持视频连接、码率、分辨率和触控逻辑不变。
+
 ## 功能
 
 - **实时画面**：H.264 硬件编码，通过 WebRTC 传输到浏览器。
@@ -25,7 +30,7 @@ ADB shell 可探索独立运行及部分系统命令功能，但完整免 root �
 
 ## 安装与使用
 
-1. 在 Magisk 中安装 `dist/ScreenBridge-v1.0.0.zip`。
+1. 在 Magisk 中安装 `dist/ScreenBridge-v1.0.1.zip`。
 2. 重启手机，服务默认延迟 10 秒启动。
 3. 电脑与手机连接同一网络，在浏览器打开：
 
@@ -100,7 +105,7 @@ go test -race ./...
 make
 ```
 
-产物：`bin/screenbridge` 和 `dist/ScreenBridge-v1.0.0.zip`。Magisk 模块 ID 为 `screenbridge`。主机测试不能替代手机与浏览器实测。
+产物：`bin/screenbridge` 和 `dist/ScreenBridge-v1.0.1.zip`。Magisk 模块 ID 为 `screenbridge`。主机测试不能替代手机与浏览器实测。
 
 ## 项目结构
 
