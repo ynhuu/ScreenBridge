@@ -1,0 +1,42 @@
+# 构建产物与安装包
+/bin/
+/dist/
+
+# 原生构建缓存、生成代码与设备系统库
+/native/_build/
+/native/generated/
+/native/libs/
+
+# 本地宣传素材（不随源码提交）
+/assets/
+
+# 测试、覆盖率与性能分析输出
+*.test
+/coverage.out
+/coverage.html
+/coverage/
+*.prof
+
+# 运行日志与进程文件
+*.log
+*.pid
+
+# 本地环境配置；保留可提交的配置模板
+.env
+.env.*
+!.env.example
+/go.work
+/go.work.sum
+
+# 编辑器配置与临时文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统元数据
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
