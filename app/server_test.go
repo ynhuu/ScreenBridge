@@ -165,6 +165,17 @@ func TestControlWebSocketAcknowledgesMessages(t *testing.T) {
 	}
 }
 
+func TestKeyCodeAllowlist(t *testing.T) {
+	for _, code := range []string{"BACK", "HOME", "ENTER", "APP_SWITCH", "DEL", "POWER"} {
+		if !allowedKeyCodes[code] {
+			t.Fatalf("missing supported key code %s", code)
+		}
+	}
+	if allowedKeyCodes["NOT_A_KEY"] {
+		t.Fatal("unexpected key code NOT_A_KEY")
+	}
+}
+
 type recordedTouchEvent struct {
 	action        string
 	width, height int

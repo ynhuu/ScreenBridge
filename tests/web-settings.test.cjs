@@ -82,6 +82,19 @@ test("upward menus mirror button order, corners and choice positions", () => {
   assert.match(html, /\.virtual-keys:not\(\.opens-below\) #scale-options\s*\{\s*top: 0; bottom: auto;/);
 });
 
+test("upward menus keep separators between every adjacent button", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../app/web/index.html"), "utf8");
+  const upward = html.match(/\.virtual-keys:not\(\.opens-below\) > button \{[^}]+\}/)[0];
+  assert.match(upward, /border-top: 0;/);
+  assert.match(upward, /border-bottom: 1px solid #414653;/);
+  // #video-bitrate and #video-scale set border-top at ID specificity for the
+  // downward layout, so upward mode needs an equally specific bottom-border rule.
+  const override = html.match(/\.virtual-keys:not\(\.opens-below\) > #video-bitrate,\s*\.virtual-keys:not\(\.opens-below\) > #video-scale \{[^}]+\}/)[0];
+  assert.match(override, /border-top: 0;/);
+  assert.match(override, /border-bottom: 1px solid #414653;/);
+  assert.match(html.match(/#video-bitrate, #video-scale \{[^}]+\}/)[0], /border-top: 1px solid #414653;/);
+});
+
 test("bitrate and scale choices are horizontal rows with equally sized options", () => {
   const html = fs.readFileSync(path.join(__dirname, "../app/web/index.html"), "utf8");
   const menu = html.match(/#bitrate-options, #scale-options\s*\{([^}]+)\}/)[1];
@@ -129,16 +142,17 @@ test("active controls retain edge rounding without clipping popup menus", () => 
   assert.match(html, /--control-active: rgba\(20, 116, 132, \.85\)/);
 });
 
-test("vertical controls follow navigation, fullscreen, bitrate, scale order", () => {
+test("vertical controls follow navigation, power, fullscreen, bitrate, scale order", () => {
   const html = fs.readFileSync(path.join(__dirname, "../app/web/index.html"), "utf8");
   const nav = html.match(/<nav id="virtual-keys"[\s\S]*?<\/nav>/)[0];
-  const markers = ['data-key="BACK"', 'data-key="HOME"', 'data-key="APP_SWITCH"', 'id="fullscreen-toggle"', 'id="video-bitrate"', 'id="video-scale"'];
+  const markers = ['data-key="BACK"', 'data-key="HOME"', 'data-key="APP_SWITCH"', 'data-key="POWER"', 'id="fullscreen-toggle"', 'id="video-bitrate"', 'id="video-scale"'];
   let previous = -1;
   for (const marker of markers) {
     const position = nav.indexOf(marker);
     assert.ok(position > previous, `${marker} is out of order`);
     previous = position;
   }
+  assert.match(nav.match(/<button[^>]*data-key="POWER"[^>]*>/)[0], /aria-label="电源"/);
 });
 
 test("fullscreen button is hidden in Safari but remains visible in Chrome", () => {

@@ -80,11 +80,14 @@ func (s *serverApp) handleSwipe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": duration})
 }
 
+var allowedKeyCodes = map[string]bool{
+	"BACK": true, "HOME": true, "ENTER": true, "APP_SWITCH": true, "DEL": true, "POWER": true,
+}
+
 func (s *serverApp) handleKey(w http.ResponseWriter, r *http.Request) {
 	code := strings.ToUpper(r.URL.Query().Get("code"))
-	allowed := map[string]bool{"BACK": true, "HOME": true, "ENTER": true, "APP_SWITCH": true, "DEL": true}
-	if !allowed[code] {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "code must be BACK, HOME, ENTER, APP_SWITCH or DEL"})
+	if !allowedKeyCodes[code] {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "code must be BACK, HOME, ENTER, APP_SWITCH, DEL or POWER"})
 		return
 	}
 	output, err := runCombined(r.Context(), "/system/bin/input", "keyevent", "KEYCODE_"+code)

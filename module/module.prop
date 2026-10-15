@@ -1,6 +1,6 @@
 id=screenbridge
 name=ScreenBridge
-version=1.0.1
-versionCode=10001
+version=1.1.0
+versionCode=10100
 author=Ynhuu
 description=Single-binary Go HTTP UI control service with NDK H.264, WebRTC, and WebP capture.
