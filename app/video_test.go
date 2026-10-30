@@ -169,6 +169,8 @@ func TestH264VideoNegotiationValidation(t *testing.T) {
 
 func TestAudioOnlyOfferDoesNotKickOldVideo(t *testing.T) {
 	app := newServer(defaultConfig(), ".", t.TempDir(), log.New(io.Discard, "", 0))
+	clientID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	app.controlClient = clientID
 	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +190,7 @@ func TestAudioOnlyOfferDoesNotKickOldVideo(t *testing.T) {
 	defer old.Close()
 	session := &videoSession{peer: old, stop: make(chan struct{}), done: make(chan struct{})}
 	app.videoSessions["old"] = session
-	body, _ := json.Marshal(videoOfferRequest{Type: "offer", SDP: offer.SDP})
+	body, _ := json.Marshal(videoOfferRequest{Type: "offer", SDP: offer.SDP, ClientID: clientID})
 	response := httptest.NewRecorder()
 	app.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/webrtc/offer", bytes.NewReader(body)))
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "H.264 video track") {

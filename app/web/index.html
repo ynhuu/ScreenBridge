@@ -305,11 +305,14 @@
     let videoGeneration = 0;
     let peerConnection = null;
     let videoSessionId = "";
+    const controlClientID = Array.from(crypto.getRandomValues(new Uint8Array(16)), value =>
+      value.toString(16).padStart(2, "0")).join("");
     let controlSocket = null;
     let controlConnectPromise = null;
     let controlRequestID = 0;
     let controlReconnectTimer = 0;
     let pageIsClosing = false;
+    let clientWasSuperseded = false;
     const pendingControlRequests = new Map();
     let clearOverlayTimer = 0;
     let statusTimer = 0;
@@ -378,6 +381,7 @@
     }
 
     function setStatus(message, isError = false) {
+      if (clientWasSuperseded) return;
       status.textContent = message;
       status.classList.toggle("error", isError);
       status.classList.add("visible");
@@ -680,7 +684,8 @@
         await peer.setLocalDescription(offer);
         await waitForIceGathering(peer);
         const answer = await videoRequest("/webrtc/offer", {
-          type: peer.localDescription.type, sdp: peer.localDescription.sdp, bitRate, scale
+          type: peer.localDescription.type, sdp: peer.localDescription.sdp, bitRate, scale,
+          clientId: controlClientID
         }, { signal: requestController.signal });
         if (typeof answer.sessionId !== "string" || !answer.sessionId) throw new Error("视频会话信息无效");
         if (generation !== videoGeneration) {
@@ -724,34 +729,57 @@
       }
     }
 
+    function handleControlTakeover() {
+      if (pageIsClosing) return;
+      pageIsClosing = true;
+      clearTimeout(controlReconnectTimer);
+      videoRequestController?.abort();
+      void stopVideo();
+      setStatsOpen(false);
+      setStatus("已被新连接接管，请刷新页面", true);
+      clearTimeout(statusTimer);
+      clientWasSuperseded = true;
+    }
+
     function connectControlSocket() {
       if (pageIsClosing) return Promise.reject(new Error("控制连接已关闭"));
-      if (controlSocket && controlSocket.readyState === WebSocket.OPEN) return Promise.resolve(controlSocket);
       if (controlConnectPromise) return controlConnectPromise;
+      if (controlSocket && controlSocket.readyState === WebSocket.OPEN) return Promise.resolve(controlSocket);
       clearTimeout(controlReconnectTimer);
 
       const scheme = location.protocol === "https:" ? "wss:" : "ws:";
       let socket;
       let connectPromise;
       connectPromise = new Promise((resolve, reject) => {
-        socket = new WebSocket(`${scheme}//${location.host}/ws/control`);
+        socket = new WebSocket(`${scheme}//${location.host}/ws/control?clientId=${controlClientID}`);
         controlSocket = socket;
         let opened = false;
+        let ready = false;
         const timeout = setTimeout(() => {
-          if (opened) return;
-          reject(new Error("控制 WebSocket 连接超时"));
+          if (ready) return;
+          reject(new Error("控制 WebSocket 就绪超时"));
           socket.close();
-        }, 5000);
+        }, 20000);
 
         socket.addEventListener("open", () => {
           opened = true;
-          clearTimeout(timeout);
-          if (controlConnectPromise === connectPromise) controlConnectPromise = null;
-          resolve(socket);
         });
         socket.addEventListener("message", event => {
           let message;
           try { message = JSON.parse(event.data); } catch (_) { return; }
+          if (message.type === "ready") {
+            if (message.clientId !== controlClientID) {
+              reject(new Error("控制连接身份校验失败"));
+              socket.close();
+              return;
+            }
+            if (ready) return;
+            ready = true;
+            clearTimeout(timeout);
+            if (controlConnectPromise === connectPromise) controlConnectPromise = null;
+            resolve(socket);
+            return;
+          }
           const pending = pendingControlRequests.get(String(message.id));
           if (!pending) {
             if (!message.ok && message.error) setStatus(message.error, true);
@@ -763,16 +791,26 @@
           else pending.reject(new Error(message.error || "控制操作失败"));
         });
         socket.addEventListener("error", () => {
-          if (!opened) reject(new Error("控制 WebSocket 连接失败"));
+          if (!ready) reject(new Error("控制 WebSocket 连接失败"));
         });
-        socket.addEventListener("close", () => {
+        socket.addEventListener("close", event => {
           clearTimeout(timeout);
-          if (!opened) reject(new Error("控制 WebSocket 连接失败"));
-          if (controlSocket === socket) controlSocket = null;
+          if (!ready) reject(new Error(opened ? "控制连接未就绪" : "控制 WebSocket 连接失败"));
+          const isCurrentSocket = controlSocket === socket;
+          if (isCurrentSocket) controlSocket = null;
           if (controlConnectPromise === connectPromise) controlConnectPromise = null;
           failPendingControlRequests(new Error("控制连接中断，请重试"), socket);
+          if (!isCurrentSocket) return;
+          if (event.code === 4001) {
+            handleControlTakeover();
+            return;
+          }
           if (!pageIsClosing) {
-            controlReconnectTimer = setTimeout(() => connectControlSocket().catch(() => {}), 1000);
+            controlReconnectTimer = setTimeout(() => {
+              connectControlSocket().then(() => {
+                if (!videoEnabled && !videoConnecting && !pageIsClosing) void startVideo();
+              }).catch(() => {});
+            }, 1000);
           }
         });
       });
@@ -1092,8 +1130,9 @@
       }
       if (peerConnection) peerConnection.close();
     });
-    void connectControlSocket().catch(() => {});
-    void startVideo();
+    void connectControlSocket().then(() => startVideo()).catch(error => {
+      if (!pageIsClosing) setStatus(error.message || "控制连接失败", true);
+    });
   </script>
 </body>
 </html>

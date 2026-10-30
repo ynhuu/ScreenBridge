@@ -133,7 +133,7 @@ func TestControlWebSocketAcknowledgesMessages(t *testing.T) {
 	app := newServer(defaultConfig(), ".", t.TempDir(), logger)
 	server := httptest.NewServer(app)
 	defer server.Close()
-	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/control"
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/control?clientId=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	conn, response, err := websocket.DefaultDialer.Dial(websocketURL, nil)
 	if err != nil {
 		if response != nil {
@@ -142,6 +142,7 @@ func TestControlWebSocketAcknowledgesMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
+	expectControlWSReady(t, conn, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	if err := conn.WriteJSON(controlWSRequest{ID: "request-1", Path: "/unsupported"}); err != nil {
 		t.Fatal(err)
@@ -217,11 +218,12 @@ func TestControlWebSocketStreamsTouchEvents(t *testing.T) {
 	app.touch = input
 	server := httptest.NewServer(app)
 	defer server.Close()
-	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/control"
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/control?clientId=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	conn, _, err := websocket.DefaultDialer.Dial(websocketURL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectControlWSReady(t, conn, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	writeTouch := func(id, action string, params map[string]any) {
 		t.Helper()
@@ -256,6 +258,20 @@ func TestControlWebSocketStreamsTouchEvents(t *testing.T) {
 		t.Fatalf("unexpected injected touch sequence: %#v", events)
 	}
 	_ = conn.Close()
+}
+
+func expectControlWSReady(t *testing.T, conn *websocket.Conn, clientID string) {
+	t.Helper()
+	var message struct {
+		Type     string `json:"type"`
+		ClientID string `json:"clientId"`
+	}
+	if err := conn.ReadJSON(&message); err != nil {
+		t.Fatalf("read control WebSocket ready message: %v", err)
+	}
+	if message.Type != "ready" || message.ClientID != clientID {
+		t.Fatalf("unexpected control WebSocket ready message: %#v", message)
+	}
 }
 
 func TestTouchSessionReleasedWhenWebSocketCloses(t *testing.T) {

@@ -16,10 +16,12 @@ import (
 )
 
 const (
-	controlWSReadLimit  = 16 << 10
-	controlWSWriteWait  = 10 * time.Second
-	controlWSPongWait   = 70 * time.Second
-	controlWSPingPeriod = 60 * time.Second
+	controlWSReadLimit   = 16 << 10
+	controlWSWriteWait   = 10 * time.Second
+	controlWSPongWait    = 70 * time.Second
+	controlWSPingPeriod  = 60 * time.Second
+	controlWSSuperseded  = 4001
+	maxSupersededClients = 128
 )
 
 type controlWSRequest struct {
@@ -60,11 +62,28 @@ func newControlWSUpgrader() websocket.Upgrader {
 var controlWSUpgrader = newControlWSUpgrader()
 
 func (s *serverApp) handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
+	clientID := r.URL.Query().Get("clientId")
+	if !validControlClientID(clientID) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "a valid clientId is required"})
+		return
+	}
 	conn, err := controlWSUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+	if !s.claimControlClient(clientID, conn) {
+		_ = conn.WriteControl(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(controlWSSuperseded, "this client was replaced by a newer client"),
+			time.Now().Add(controlWSWriteWait),
+		)
+		return
+	}
+	defer s.releaseControlClient(conn)
+	if err := conn.WriteJSON(map[string]string{"type": "ready", "clientId": clientID}); err != nil {
+		return
+	}
 	touchOwner := &touchSessionOwner{}
 	defer s.cancelTouchOwner(touchOwner)
 	conn.SetReadLimit(controlWSReadLimit)
@@ -97,7 +116,7 @@ func (s *serverApp) handleControlWebSocket(w http.ResponseWriter, r *http.Reques
 	for {
 		messageType, message, err := conn.ReadMessage()
 		if err != nil {
-			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, controlWSSuperseded) {
 				s.logger.Printf("control WebSocket closed: %v", err)
 			}
 			return
@@ -114,6 +133,84 @@ func (s *serverApp) handleControlWebSocket(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
+}
+
+func (s *serverApp) claimControlClient(clientID string, conn *websocket.Conn) bool {
+	// Serialize control takeovers with video offers so an older in-flight offer
+	// cannot replace the stream after the newer client has taken control.
+	s.videoOfferMu.Lock()
+	defer s.videoOfferMu.Unlock()
+
+	s.controlMu.Lock()
+	if _, superseded := s.supersededClients[clientID]; superseded {
+		s.controlMu.Unlock()
+		return false
+	}
+	previous := s.controlConn
+	previousClientID := s.controlClient
+	if previousClientID != "" && previousClientID != clientID {
+		s.rememberSupersededClient(previousClientID)
+	}
+	s.controlConn = conn
+	s.controlClient = clientID
+	s.controlMu.Unlock()
+
+	if previous != nil && previous != conn {
+		_ = previous.WriteControl(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(controlWSSuperseded, "replaced by a newer client"),
+			time.Now().Add(controlWSWriteWait),
+		)
+		_ = previous.Close()
+	}
+	if previousClientID != clientID {
+		if err := s.replaceVideoSessions(context.Background()); err != nil {
+			s.logger.Printf("stop replaced video sessions: %v", err)
+		}
+	}
+	return true
+}
+
+func (s *serverApp) rememberSupersededClient(clientID string) {
+	if _, exists := s.supersededClients[clientID]; exists {
+		return
+	}
+	if s.supersededClients == nil {
+		s.supersededClients = make(map[string]struct{})
+	}
+	if len(s.supersededOrder) == maxSupersededClients {
+		delete(s.supersededClients, s.supersededOrder[0])
+		copy(s.supersededOrder, s.supersededOrder[1:])
+		s.supersededOrder = s.supersededOrder[:len(s.supersededOrder)-1]
+	}
+	s.supersededClients[clientID] = struct{}{}
+	s.supersededOrder = append(s.supersededOrder, clientID)
+}
+
+func (s *serverApp) releaseControlClient(conn *websocket.Conn) {
+	s.controlMu.Lock()
+	if s.controlConn == conn {
+		s.controlConn = nil
+	}
+	s.controlMu.Unlock()
+}
+
+func (s *serverApp) isActiveControlClient(clientID string) bool {
+	s.controlMu.Lock()
+	defer s.controlMu.Unlock()
+	return s.controlClient == clientID
+}
+
+func validControlClientID(clientID string) bool {
+	if len(clientID) != 32 {
+		return false
+	}
+	for _, value := range clientID {
+		if !(value >= '0' && value <= '9') && !(value >= 'a' && value <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *serverApp) handleControlWSMessage(parent context.Context, messageType int, message []byte) controlWSResponse {

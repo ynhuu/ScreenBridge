@@ -27,10 +27,11 @@ const (
 )
 
 type videoOfferRequest struct {
-	Type    string `json:"type"`
-	SDP     string `json:"sdp"`
-	BitRate int    `json:"bitRate"`
-	Scale   int    `json:"scale"`
+	Type     string `json:"type"`
+	SDP      string `json:"sdp"`
+	BitRate  int    `json:"bitRate"`
+	Scale    int    `json:"scale"`
+	ClientID string `json:"clientId"`
 }
 
 type videoOfferResponse struct {
@@ -111,6 +112,10 @@ func (s *serverApp) handleVideoOffer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bitRate must be 1000000, 2000000, or 5000000"})
 		return
 	}
+	if !validControlClientID(request.ClientID) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "a valid clientId is required"})
+		return
+	}
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid WebRTC offer"})
 		return
@@ -124,6 +129,10 @@ func (s *serverApp) handleVideoOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.videoClosing {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "video service is shutting down"})
+		return
+	}
+	if !s.isActiveControlClient(request.ClientID) {
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "this client has been replaced by a newer connection"})
 		return
 	}
 	peer, err := webrtc.NewPeerConnection(webrtc.Configuration{})

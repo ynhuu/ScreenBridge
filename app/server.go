@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -21,32 +23,38 @@ var (
 )
 
 type serverApp struct {
-	config        Config
-	moduleDir     string
-	stateDir      string
-	logger        *log.Logger
-	dumpMu        sync.Mutex
-	touchMu       sync.Mutex
-	touchOwner    *touchSessionOwner
-	touch         touchInjector
-	videoMu       sync.Mutex
-	videoOfferMu  sync.Mutex
-	videoClosing  bool // guarded by videoOfferMu
-	videoSessions map[string]*videoSession
-	apiLevel      string
-	deviceABI     string
+	config            Config
+	moduleDir         string
+	stateDir          string
+	logger            *log.Logger
+	dumpMu            sync.Mutex
+	touchMu           sync.Mutex
+	touchOwner        *touchSessionOwner
+	touch             touchInjector
+	controlMu         sync.Mutex
+	controlConn       *websocket.Conn
+	controlClient     string
+	supersededClients map[string]struct{}
+	supersededOrder   []string
+	videoMu           sync.Mutex
+	videoOfferMu      sync.Mutex
+	videoClosing      bool // guarded by videoOfferMu
+	videoSessions     map[string]*videoSession
+	apiLevel          string
+	deviceABI         string
 }
 
 func newServer(config Config, moduleDir, stateDir string, logger *log.Logger) *serverApp {
 	app := &serverApp{
-		config:        config,
-		moduleDir:     moduleDir,
-		stateDir:      stateDir,
-		logger:        logger,
-		touch:         newTouchInjector(),
-		videoSessions: make(map[string]*videoSession),
-		apiLevel:      commandString("/system/bin/getprop", "ro.build.version.sdk"),
-		deviceABI:     commandString("/system/bin/getprop", "ro.product.cpu.abi"),
+		config:            config,
+		moduleDir:         moduleDir,
+		stateDir:          stateDir,
+		logger:            logger,
+		touch:             newTouchInjector(),
+		videoSessions:     make(map[string]*videoSession),
+		supersededClients: make(map[string]struct{}),
+		apiLevel:          commandString("/system/bin/getprop", "ro.build.version.sdk"),
+		deviceABI:         commandString("/system/bin/getprop", "ro.product.cpu.abi"),
 	}
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		logger.Printf("create state directory: %v", err)

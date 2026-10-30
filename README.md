@@ -6,6 +6,7 @@
 
 ## v1.2.0 更新
 
+- 新客户端连接会接管控制权，同时断开旧客户端的控制通道和视频流；被接管页面停止自动重连。视频会话绑定当前控制客户端，过期请求不能抢回视频流。
 - 新增单行实时视频统计，可查看解码帧率、接收码率、抖动缓冲、平均解码耗时和网络往返 RTT。点统计按钮打开统计行并收起控制菜单；统计行会在操作屏幕时保持显示，再次展开菜单并点统计按钮可关闭。
 - H.264 周期关键帧间隔从 2 秒缩短为 1 秒，改善丢包或参考链损坏后的恢复等待。
 - 调整统计按钮与码率按钮的位置。
@@ -54,7 +55,7 @@ ADB shell 可探索独立运行及部分系统命令功能，但完整免 root �
 
 四方块菜单按钮点击后展开等宽竖列菜单：按钮在屏幕上半部时向下展开，下半部时向上展开，顺序为返回、主页、最近任务、电源、全屏、统计、码率、大小。统计行与菜单独立显示，可在屏幕操作期间查看。全屏按钮可切换浏览器全屏，保留触控和浮动按钮。Android Chrome 支持此操作；Safari 中隐藏该按钮，其他不支持网页全屏的浏览器会禁用该按钮。
 
-服务同时只保留一个视频会话，新连接会替换旧视频，但不会关闭旧客户端的控制连接。
+服务同时只接受一个控制客户端和一个视频会话。新客户端连接会接管控制权并断开旧客户端；被接管的页面停止自动重连。
 
 ## 配置
 
@@ -97,13 +98,13 @@ curl 'http://PHONE_IP:7913/click?x=540&y=960'
 curl 'http://PHONE_IP:7913/screenshot?quality=80&scale=2' -o screen.webp
 ```
 
-控制 WebSocket：`ws://PHONE_IP:7913/ws/control`。
+控制 WebSocket：`ws://PHONE_IP:7913/ws/control?clientId=...`，`clientId` 为本页生成的 32 位小写十六进制标识。视频 offer 必须携带相同的 `clientId`；新标识会接管旧客户端。
 
 ```json
 {"id":"1","path":"/key","params":{"code":"HOME"}}
 ```
 
-视频信令使用 `POST /webrtc/offer`，提交 `type`、`sdp` 和可选的 `bitRate`、`scale`；`POST /webrtc/close` 通过 `sessionId` 关闭会话。
+视频信令使用 `POST /webrtc/offer`，提交 `type`、`sdp`、`clientId` 和可选的 `bitRate`、`scale`；`POST /webrtc/close` 通过 `sessionId` 关闭会话。
 
 ## 构建
 
