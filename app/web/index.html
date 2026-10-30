@@ -57,7 +57,7 @@
       font-weight: 600;
       text-align: center;
     }
-    #video-bitrate:focus-visible, #video-scale:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+    #video-bitrate:focus-visible, #video-scale:focus-visible, #stats-toggle:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
     #bitrate-options, #scale-options {
       display: flex;
       position: absolute;
@@ -71,7 +71,7 @@
       overflow: hidden;
       box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
     }
-    #bitrate-options { width: min(256px, calc(100vw - 80px)); }
+    #bitrate-options { width: min(180px, calc(100vw - 80px)); }
     #scale-options { bottom: 0; }
     #bitrate-options[hidden], #scale-options[hidden] { display: none; }
     .video-option { display: block; flex: 1; min-width: 0; min-height: 40px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #f4f5f7; font-size: 12px; font-weight: 600; text-align: center; }
@@ -98,6 +98,34 @@
     }
     #status.visible { opacity: 1; }
     #status.error { color: #ff8c8c; }
+    #stats-panel {
+      position: absolute;
+      z-index: 6;
+      top: 12px;
+      left: 50%;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 3px;
+      width: min(520px, calc(100% - 24px));
+      padding: 6px;
+      transform: translateX(-50%);
+      border: 1px solid rgba(194, 202, 218, .24);
+      border-radius: 10px;
+      background: rgba(23, 26, 33, .94);
+      color: #f4f5f7;
+      box-shadow: 0 5px 16px rgba(0, 0, 0, .32);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    #stats-panel[hidden] { display: none; }
+    .stats-item { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; white-space: nowrap; }
+    .stats-item span { flex: none; color: #9da7b8; font-size: 10px; }
+    .stats-item strong { min-width: 0; overflow: hidden; color: #f4f5f7; font-size: 10px; font-weight: 650; text-overflow: ellipsis; }
+    @media (max-width: 360px) {
+      #stats-panel { gap: 1px; padding: 5px 3px; }
+      .stats-item { gap: 2px; padding-right: 1px; padding-left: 1px; }
+      .stats-item span, .stats-item strong { font-size: 9px; }
+    }
     #screen-viewport { --floating-controls-top: calc(60% - 24px); position: relative; display: flex; flex: 1; min-height: 0; width: 100%; align-items: center; justify-content: center; overflow: hidden; }
     .screen {
       position: relative;
@@ -158,7 +186,7 @@
     .virtual-key[data-key="BACK"] { border-radius: 11px 11px 0 0; }
     #video-bitrate { flex-basis: auto; }
     #video-scale { flex-basis: auto; border-radius: 0 0 11px 11px; }
-    .virtual-key:active, #video-bitrate:active, #video-scale:active,
+    .virtual-key:active, #stats-toggle[aria-expanded="true"], #video-bitrate:active, #video-scale:active,
     #video-bitrate[aria-expanded="true"], #video-scale[aria-expanded="true"] { background: var(--control-active); }
     #fullscreen-toggle[hidden] { display: none; }
     #fullscreen-toggle[aria-pressed="true"] { background: var(--control-active); }
@@ -190,6 +218,13 @@
   <body>
   <main id="screen-viewport">
     <div id="status" role="status" aria-live="polite"></div>
+    <section id="stats-panel" aria-label="视频实时统计" hidden>
+      <div class="stats-item"><span>FPS</span><strong id="stats-fps">—</strong></div>
+      <div class="stats-item"><span>码率</span><strong id="stats-bitrate">—</strong></div>
+      <div class="stats-item"><span>缓冲</span><strong id="stats-buffer">—</strong></div>
+      <div class="stats-item"><span>解码</span><strong id="stats-decode">—</strong></div>
+      <div class="stats-item"><span>延迟</span><strong id="stats-rtt">—</strong></div>
+    </section>
     <div class="screen" id="screen">
       <video id="screen-video" autoplay playsinline muted></video>
       <div id="gesture-layer" aria-label="屏幕触控区域">
@@ -207,10 +242,9 @@
       <button class="video-option" type="button" data-scale="4" aria-pressed="false">1/4</button>
     </div>
     <div id="bitrate-options" role="group" aria-label="选择视频码率" hidden>
-      <button class="video-option" type="button" data-bitrate="250000" aria-pressed="false">250k</button>
-      <button class="video-option" type="button" data-bitrate="500000" aria-pressed="true">500k</button>
-      <button class="video-option" type="button" data-bitrate="1000000" aria-pressed="false">1m</button>
-      <button class="video-option" type="button" data-bitrate="2000000" aria-pressed="false">2m</button>
+      <button class="video-option" type="button" data-bitrate="1000000" aria-pressed="true">1M</button>
+      <button class="video-option" type="button" data-bitrate="2000000" aria-pressed="false">2M</button>
+      <button class="video-option" type="button" data-bitrate="5000000" aria-pressed="false">5M</button>
     </div>
     <button class="virtual-key" type="button" data-key="BACK" data-label="返回" aria-label="返回">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"></path></svg>
@@ -227,7 +261,10 @@
     <button id="fullscreen-toggle" class="virtual-key" type="button" aria-label="进入全屏" title="进入全屏" aria-pressed="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"></path></svg>
     </button>
-    <button id="video-bitrate" type="button" aria-label="视频码率：500k" aria-haspopup="true" aria-expanded="false" aria-controls="bitrate-options">500k</button>
+    <button id="stats-toggle" class="virtual-key" type="button" aria-label="查看实时统计" title="实时统计" aria-expanded="false" aria-controls="stats-panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M7 15v-4m5 4V6m5 9V9"></path></svg>
+    </button>
+    <button id="video-bitrate" type="button" aria-label="视频码率：1M" aria-haspopup="true" aria-expanded="false" aria-controls="bitrate-options">1M</button>
     <button id="video-scale" type="button" aria-label="画面大小：1/2" aria-haspopup="true" aria-expanded="false" aria-controls="scale-options">1/2</button>
   </nav>
   <button id="keys-toggle" type="button" aria-expanded="false" aria-controls="virtual-keys" aria-label="显示控制按钮" title="显示控制按钮">
@@ -253,6 +290,13 @@
     const bitRateOptions = document.getElementById("bitrate-options");
     const videoScaleButton = document.getElementById("video-scale");
     const scaleOptions = document.getElementById("scale-options");
+    const statsToggle = document.getElementById("stats-toggle");
+    const statsPanel = document.getElementById("stats-panel");
+    const statsFps = document.getElementById("stats-fps");
+    const statsBitrate = document.getElementById("stats-bitrate");
+    const statsBuffer = document.getElementById("stats-buffer");
+    const statsDecode = document.getElementById("stats-decode");
+    const statsRtt = document.getElementById("stats-rtt");
     const status = document.getElementById("status");
     let gesture = null;
     let busy = false;
@@ -276,6 +320,9 @@
     let screenshotWidth = 0;
     let screenshotHeight = 0;
     let screenshotScale = 1;
+    let statsTimer = 0;
+    let statsSample = null;
+    let statsRequestPending = false;
     function readVideoPreference(key, allowed, fallback) {
       try {
         const value = Number(localStorage.getItem(key));
@@ -287,7 +334,7 @@
       try { localStorage.setItem(key, String(value)); } catch (_) {}
     }
 
-    let selectedBitRate = readVideoPreference("screenbridge.bitrate", [250000, 500000, 1000000, 2000000], 500000);
+    let selectedBitRate = readVideoPreference("screenbridge.bitrate", [1000000, 2000000, 5000000], 1000000);
     let selectedScale = readVideoPreference("screenbridge.scale", [2, 3, 4], 2);
     let videoRequestController = null;
     let pendingDisplayInfo = null;
@@ -336,6 +383,138 @@
       status.classList.add("visible");
       clearTimeout(statusTimer);
       statusTimer = setTimeout(() => status.classList.remove("visible"), isError ? 3500 : 1800);
+    }
+
+    function clearStatsMetrics() {
+      statsFps.textContent = "—";
+      statsBitrate.textContent = "—";
+      statsBuffer.textContent = "—";
+      statsDecode.textContent = "—";
+      statsRtt.textContent = "—";
+    }
+
+    function formatStatsBitrate(bitsPerSecond) {
+      if (!Number.isFinite(bitsPerSecond) || bitsPerSecond < 0) return "—";
+      if (bitsPerSecond >= 1_000_000) return `${(bitsPerSecond / 1_000_000).toFixed(1)}M`;
+      return `${Math.round(bitsPerSecond / 1_000)}k`;
+    }
+
+    function formatStatsDuration(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return "—";
+      const milliseconds = seconds * 1000;
+      return `${milliseconds < 10 ? milliseconds.toFixed(1) : Math.round(milliseconds)}ms`;
+    }
+
+    async function updateVideoStats() {
+      if (statsPanel.hidden || statsRequestPending) return;
+      const peer = peerConnection;
+      if (!peer || peer.connectionState === "closed" || pageIsClosing) {
+        statsSample = null;
+        clearStatsMetrics();
+        return;
+      }
+
+      statsRequestPending = true;
+      try {
+        const report = await peer.getStats();
+        if (statsPanel.hidden || peerConnection !== peer) return;
+
+        const reports = [];
+        report.forEach(item => reports.push(item));
+        const inbound = reports.find(item => item.type === "inbound-rtp" && (item.kind === "video" || item.mediaType === "video"));
+        const selectedPairId = reports.find(item => item.type === "transport" && item.selectedCandidatePairId)?.selectedCandidatePairId;
+        const candidatePairs = reports.filter(item => item.type === "candidate-pair" && item.state === "succeeded");
+        const candidatePair = (selectedPairId && report.get(selectedPairId))
+          || candidatePairs.find(item => item.selected === true)
+          || candidatePairs.find(item => item.nominated === true)
+          || candidatePairs[0];
+        statsRtt.textContent = candidatePair && Number.isFinite(candidatePair.currentRoundTripTime)
+          ? formatStatsDuration(candidatePair.currentRoundTripTime)
+          : "—";
+
+        if (!inbound) {
+          statsFps.textContent = "—";
+          statsBitrate.textContent = "—";
+          statsBuffer.textContent = "—";
+          statsDecode.textContent = "—";
+          statsSample = null;
+          return;
+        }
+
+        const now = performance.now();
+        let fps = Number.isFinite(inbound.framesPerSecond) ? inbound.framesPerSecond : NaN;
+        let bitrate = NaN;
+        let bufferSeconds = NaN;
+        let decodeSecondsPerFrame = NaN;
+        const previous = statsSample;
+        if (previous && previous.id === inbound.id) {
+          const elapsed = (now - previous.at) / 1000;
+          if (elapsed > 0) {
+            const frameDelta = Number.isFinite(inbound.framesDecoded) && Number.isFinite(previous.framesDecoded)
+              ? inbound.framesDecoded - previous.framesDecoded : NaN;
+            const byteDelta = Number.isFinite(inbound.bytesReceived) && Number.isFinite(previous.bytesReceived)
+              ? inbound.bytesReceived - previous.bytesReceived : NaN;
+            if (Number.isFinite(frameDelta) && frameDelta >= 0) fps = frameDelta / elapsed;
+            if (Number.isFinite(byteDelta) && byteDelta >= 0) bitrate = byteDelta * 8 / elapsed;
+
+            const emittedDelta = Number.isFinite(inbound.jitterBufferEmittedCount) && Number.isFinite(previous.jitterBufferEmittedCount)
+              ? inbound.jitterBufferEmittedCount - previous.jitterBufferEmittedCount : NaN;
+            const bufferDelta = Number.isFinite(inbound.jitterBufferDelay) && Number.isFinite(previous.jitterBufferDelay)
+              ? inbound.jitterBufferDelay - previous.jitterBufferDelay : NaN;
+            if (emittedDelta > 0 && bufferDelta >= 0) bufferSeconds = bufferDelta / emittedDelta;
+
+            const decodeDelta = Number.isFinite(inbound.totalDecodeTime) && Number.isFinite(previous.totalDecodeTime)
+              ? inbound.totalDecodeTime - previous.totalDecodeTime : NaN;
+            if (frameDelta > 0 && decodeDelta >= 0) decodeSecondsPerFrame = decodeDelta / frameDelta;
+          }
+        }
+        if (!Number.isFinite(bufferSeconds) && inbound.jitterBufferEmittedCount > 0) {
+          const totalBufferDelay = Number.isFinite(inbound.jitterBufferDelay)
+            ? inbound.jitterBufferDelay : inbound.jitterBufferTargetDelay;
+          if (Number.isFinite(totalBufferDelay)) bufferSeconds = totalBufferDelay / inbound.jitterBufferEmittedCount;
+        }
+        if (!Number.isFinite(decodeSecondsPerFrame) && inbound.framesDecoded > 0
+          && Number.isFinite(inbound.totalDecodeTime)) {
+          decodeSecondsPerFrame = inbound.totalDecodeTime / inbound.framesDecoded;
+        }
+
+        statsFps.textContent = Number.isFinite(fps) ? fps.toFixed(1) : "—";
+        statsBitrate.textContent = Number.isFinite(bitrate) ? formatStatsBitrate(bitrate) : "—";
+        statsBuffer.textContent = formatStatsDuration(bufferSeconds);
+        statsDecode.textContent = Number.isFinite(decodeSecondsPerFrame)
+          ? `${(decodeSecondsPerFrame * 1000).toFixed(1)}ms` : "—";
+        statsSample = {
+          id: inbound.id,
+          at: now,
+          bytesReceived: inbound.bytesReceived,
+          framesDecoded: inbound.framesDecoded,
+          jitterBufferDelay: inbound.jitterBufferDelay,
+          jitterBufferEmittedCount: inbound.jitterBufferEmittedCount,
+          totalDecodeTime: inbound.totalDecodeTime
+        };
+      } catch (_) {
+        if (peerConnection === peer && !statsPanel.hidden) {
+          statsSample = null;
+          clearStatsMetrics();
+        }
+      } finally {
+        statsRequestPending = false;
+      }
+    }
+
+    function setStatsOpen(open) {
+      statsPanel.hidden = !open;
+      statsToggle.setAttribute("aria-expanded", String(open));
+      const label = open ? "隐藏实时统计" : "查看实时统计";
+      statsToggle.setAttribute("aria-label", label);
+      statsToggle.title = label;
+      clearInterval(statsTimer);
+      statsTimer = 0;
+      if (!open) return;
+      statsSample = null;
+      clearStatsMetrics();
+      void updateVideoStats();
+      statsTimer = window.setInterval(() => void updateVideoStats(), 1000);
     }
 
     function drawGesture(start, end, visible = true) {
@@ -447,6 +626,7 @@
       videoGeneration++;
       videoConnecting = false;
       videoEnabled = false;
+      statsSample = null;
       const peer = peerConnection;
       peerConnection = null;
       if (peer) {
@@ -796,6 +976,12 @@
       onOpen: () => bitRateChoice.setOpen(false),
       onChange: value => { selectedScale = value; saveVideoPreference("screenbridge.scale", value); void restartVideo(); }
     });
+    statsToggle.addEventListener("click", () => {
+      bitRateChoice.setOpen(false);
+      scaleChoice.setOpen(false);
+      setStatsOpen(statsPanel.hidden);
+      setControlsExpanded(false);
+    });
     document.addEventListener("pointerdown", event => {
       if (!virtualKeys.contains(event.target)) {
         bitRateChoice.setOpen(false);
@@ -803,6 +989,11 @@
       }
     });
     document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !statsPanel.hidden) {
+        setStatsOpen(false);
+        statsToggle.focus();
+        return;
+      }
       if (event.key === "Escape" && !scaleOptions.hidden) {
         scaleChoice.setOpen(false);
         videoScaleButton.focus();
@@ -891,6 +1082,7 @@
     if (window.visualViewport) window.visualViewport.addEventListener("resize", fitScreen);
     window.addEventListener("pagehide", () => {
       pageIsClosing = true;
+      setStatsOpen(false);
       videoRequestController?.abort();
       clearTimeout(controlReconnectTimer);
       if (controlSocket) controlSocket.close(1000, "page closing");

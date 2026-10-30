@@ -301,7 +301,7 @@ extern "C" int uia_h264_create(int scaleDivisor, int frameRate, int bitRate,
   // MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR = 2.
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BITRATE_MODE, 2);
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, frameRate);
-  AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, 2);
+  AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, 1);
 
   media_status_t status = AMediaCodec_configure(
       encoder->codec, format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);

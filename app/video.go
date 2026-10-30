@@ -21,10 +21,9 @@ import (
 )
 
 const (
-	videoCaptureScale = 2
-	videoBitRate      = 500_000
-	// MediaCodec needs a nominal rate for configuration, not a capture limit.
-	encoderFrameRateHint = 30
+	videoCaptureScale     = 2
+	videoBitRate          = 1_000_000
+	maximumVideoFrameRate = 30
 )
 
 type videoOfferRequest struct {
@@ -77,7 +76,7 @@ type videoDisplayInfo struct {
 }
 
 func validVideoBitRate(bitRate int) bool {
-	return bitRate == 250_000 || bitRate == 500_000 || bitRate == 1_000_000 || bitRate == 2_000_000
+	return bitRate == 1_000_000 || bitRate == 2_000_000 || bitRate == 5_000_000
 }
 
 func validVideoScale(scale int) bool {
@@ -109,7 +108,7 @@ func (s *serverApp) handleVideoOffer(w http.ResponseWriter, r *http.Request) {
 		request.BitRate = videoBitRate
 	}
 	if !validVideoBitRate(request.BitRate) {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bitRate must be 250000, 500000, 1000000, or 2000000"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bitRate must be 1000000, 2000000, or 5000000"})
 		return
 	}
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
@@ -201,7 +200,7 @@ func (s *serverApp) handleVideoOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var width, height int
-	encoder, width, height, err = newH264Encoder(request.Scale, encoderFrameRateHint, request.BitRate)
+	encoder, width, height, err = newH264Encoder(request.Scale, maximumVideoFrameRate, request.BitRate)
 	if err != nil {
 		s.logger.Printf("initialize H.264 encoder: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "H.264 encoder initialization failed"})
@@ -354,15 +353,21 @@ func (s *serverApp) runVideoSession(session *videoSession) {
 	var clock videoRTPClock
 	var lastInfo videoDisplayInfo
 	var delay time.Duration
+	frameInterval := time.Second / time.Duration(maximumVideoFrameRate)
+	var nextFrameAt time.Time
 	for {
 		if !s.waitVideoCapture(session, delay) {
 			return
 		}
+		if !waitUntilVideoFrame(session, nextFrameAt) {
+			return
+		}
+		frameStartedAt := time.Now()
 		frame, timestamp, err := session.encoder.NextFrame()
 		delay = 0
 		if errors.Is(err, errH264DisplayChanged) {
 			session.encoder.Close()
-			encoder, width, height, createErr := newH264Encoder(session.info.Scale, encoderFrameRateHint, session.bitRate)
+			encoder, width, height, createErr := newH264Encoder(session.info.Scale, maximumVideoFrameRate, session.bitRate)
 			if createErr != nil {
 				s.logger.Printf("resize video encoder: %v", createErr)
 				return
@@ -398,6 +403,30 @@ func (s *serverApp) runVideoSession(session *videoSession) {
 				return
 			}
 		}
+		nextFrameAt = frameStartedAt.Add(frameInterval)
+	}
+}
+
+func waitUntilVideoFrame(session *videoSession, deadline time.Time) bool {
+	if deadline.IsZero() {
+		return true
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		select {
+		case <-session.stop:
+			return false
+		default:
+			return true
+		}
+	}
+	timer := time.NewTimer(remaining)
+	defer timer.Stop()
+	select {
+	case <-session.stop:
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 

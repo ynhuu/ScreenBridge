@@ -22,12 +22,12 @@ import (
 type failingVideoEncoder struct{ closed bool }
 
 func TestValidVideoBitRates(t *testing.T) {
-	for _, rate := range []int{250_000, 500_000, 1_000_000, 2_000_000} {
+	for _, rate := range []int{1_000_000, 2_000_000, 5_000_000} {
 		if !validVideoBitRate(rate) {
 			t.Errorf("supported bit rate rejected: %d", rate)
 		}
 	}
-	for _, rate := range []int{-1, 0, 125_000, 124_999, 300_000, 2_000_001} {
+	for _, rate := range []int{-1, 0, 250_000, 500_000, 800_000, 3_000_000, 5_000_001} {
 		if validVideoBitRate(rate) {
 			t.Errorf("unsupported bit rate accepted: %d", rate)
 		}

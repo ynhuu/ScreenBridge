@@ -63,7 +63,7 @@ func TestHealthAndEmbeddedControlPage(t *testing.T) {
 		}
 		if path == "/" && (!strings.Contains(response.Body.String(), `new RTCPeerConnection`) ||
 			strings.Contains(response.Body.String(), `id="video-fps"`) ||
-			!strings.Contains(response.Body.String(), `data-bitrate="500000" aria-pressed="true">500k`) ||
+			!strings.Contains(response.Body.String(), `data-bitrate="1000000" aria-pressed="true">1M`) ||
 			!strings.Contains(response.Body.String(), `data-scale="2" aria-pressed="true">1/2`) ||
 			strings.Contains(response.Body.String(), `id="video-toggle"`)) {
 			t.Fatal("embedded control page is missing")
@@ -72,12 +72,12 @@ func TestHealthAndEmbeddedControlPage(t *testing.T) {
 }
 
 func TestValidVideoBitRate(t *testing.T) {
-	for _, rate := range []int{500_000, 1_000_000, 2_000_000} {
+	for _, rate := range []int{1_000_000, 2_000_000, 5_000_000} {
 		if !validVideoBitRate(rate) {
 			t.Errorf("%d should be supported", rate)
 		}
 	}
-	for _, rate := range []int{-1, 0, 499_999, 800_000, 3_000_000} {
+	for _, rate := range []int{-1, 0, 250_000, 500_000, 800_000, 3_000_000} {
 		if validVideoBitRate(rate) {
 			t.Errorf("%d should not be supported", rate)
 		}
